@@ -38,32 +38,25 @@ namespace Yc
         //   │   └─ pa_node_base<N, pointer>  再继承一次，引入 parent（哨位节点用这个类型）
         //   │       └─ pa_node<N, T, pointer> 再继承一次，引入 T
         // ===================================================================
-        // 分配器统一 rebind 的目标（空类型；节点经由 pa_empty 从它派生）
+        // 分配器统一 rebind 的目标：非模板的空类型，整条继承链的最底层
         struct pa_placeholder
         {
         };
-        // 第 I 层槽位：在下一层基础上加一个 child（链式单继承，第 0 层不继承任何东西）
-        template<class pointer, size_t I>
-        struct pa_slot_chain : pa_slot_chain<pointer, I - 1>
+        // 槽位链：T<0> 继承 pa_placeholder 并引入第 0 个 child；
+        // T<1> 继承 T<0> 再引入第 1 个 child；以此类推，每层多一个 child 指针。
+        template<size_t I, class pointer>
+        struct pa_child : pa_child<I - 1, pointer>
         {
-            // 第 I 个分支槽位；默认零初始化，空槽位天然是空指针
             pointer child{};
         };
         template<class pointer>
-        struct pa_slot_chain<pointer, 0>
+        struct pa_child<0, pointer> : pa_placeholder
         {
             pointer child{};
         };
-        // pa_empty：把 N 层槽位收成一个类，并继承分配器占位类型。
-        // 它是**所有槽位层的派生类**，所以每层的 &child 都能隐式转成
-        // `pointer pa_empty<N, pointer>::*`（基类成员指针 → 派生类成员指针，标准转换）。
-        template<size_t N, class pointer>
-        struct pa_empty : pa_slot_chain<pointer, N - 1>, pa_placeholder
-        {
-        };
         // 再继承一层：parent（哨位节点用这个类型，没有 T）
         template<size_t N, class pointer>
-        struct pa_node_base : pa_empty<N, pointer>
+        struct pa_node_base : pa_child<N - 1, pointer>
         {
             static_assert(N != 0, "N 叉树的 N 必须 >= 1");
             pointer parent{};
@@ -76,13 +69,13 @@ namespace Yc
         };
 
         // ---- 成员指针小巧思（原作者设计，勿"顺手优化"成折叠比较）-------------
-        // "选哪个分支"变成一条运行期成员指针：32 路 switch 返回的全是
-        // `pointer pa_empty<N, pointer>::*` 类型的常量成员指针（没有 reinterpret_cast，
-        // 靠"基类成员指针 → 派生类成员指针"的标准转换），GCC 通常折成
-        // "基址 + 下标 × 8"，而不是 O(N) 比较链。
-        // N > 32 时按 32 一层剥下去，返回类型始终是 pa_empty<N, pointer>::*，递归不分叉。
+        // 成员指针的宿主取**链顶** `pa_child<N - 1, pointer>`：它是每一层槽位的派生类，
+        // 所以每层 &child 都能隐式转成 `pointer pa_child<N - 1, pointer>::*`
+        //（基类成员指针 → 派生类成员指针，标准转换，不需要 reinterpret_cast）。
+        // 32 路 switch 返回的全是这一种类型的常量成员指针，"选哪个分支"于是退化成一条
+        // 运行期成员指针；N > 32 时按 32 一层剥下去，返回类型始终相同，递归不分叉。
         template<size_t N, class pointer>
-        using pa_child_mem_ptr = pointer pa_empty<N, pointer>::*;
+        using pa_child_mem_ptr = pointer pa_child<N - 1, pointer>::*;
 
         template<size_t N, class pointer, size_t Base>
         inline pa_child_mem_ptr<N, pointer> pa_child_block(size_t i)noexcept
@@ -90,42 +83,41 @@ namespace Yc
             constexpr size_t Clamp = N - 1;
             switch (i)
             {
-            case Base + 0:  return &pa_slot_chain<pointer, (Base + 0 < N ? Base + 0 : Clamp)>::child;
-            case Base + 1:  return &pa_slot_chain<pointer, (Base + 1 < N ? Base + 1 : Clamp)>::child;
-            case Base + 2:  return &pa_slot_chain<pointer, (Base + 2 < N ? Base + 2 : Clamp)>::child;
-            case Base + 3:  return &pa_slot_chain<pointer, (Base + 3 < N ? Base + 3 : Clamp)>::child;
-            case Base + 4:  return &pa_slot_chain<pointer, (Base + 4 < N ? Base + 4 : Clamp)>::child;
-            case Base + 5:  return &pa_slot_chain<pointer, (Base + 5 < N ? Base + 5 : Clamp)>::child;
-            case Base + 6:  return &pa_slot_chain<pointer, (Base + 6 < N ? Base + 6 : Clamp)>::child;
-            case Base + 7:  return &pa_slot_chain<pointer, (Base + 7 < N ? Base + 7 : Clamp)>::child;
-            case Base + 8:  return &pa_slot_chain<pointer, (Base + 8 < N ? Base + 8 : Clamp)>::child;
-            case Base + 9:  return &pa_slot_chain<pointer, (Base + 9 < N ? Base + 9 : Clamp)>::child;
-            case Base + 10: return &pa_slot_chain<pointer, (Base + 10 < N ? Base + 10 : Clamp)>::child;
-            case Base + 11: return &pa_slot_chain<pointer, (Base + 11 < N ? Base + 11 : Clamp)>::child;
-            case Base + 12: return &pa_slot_chain<pointer, (Base + 12 < N ? Base + 12 : Clamp)>::child;
-            case Base + 13: return &pa_slot_chain<pointer, (Base + 13 < N ? Base + 13 : Clamp)>::child;
-            case Base + 14: return &pa_slot_chain<pointer, (Base + 14 < N ? Base + 14 : Clamp)>::child;
-            case Base + 15: return &pa_slot_chain<pointer, (Base + 15 < N ? Base + 15 : Clamp)>::child;
-            case Base + 16: return &pa_slot_chain<pointer, (Base + 16 < N ? Base + 16 : Clamp)>::child;
-            case Base + 17: return &pa_slot_chain<pointer, (Base + 17 < N ? Base + 17 : Clamp)>::child;
-            case Base + 18: return &pa_slot_chain<pointer, (Base + 18 < N ? Base + 18 : Clamp)>::child;
-            case Base + 19: return &pa_slot_chain<pointer, (Base + 19 < N ? Base + 19 : Clamp)>::child;
-            case Base + 20: return &pa_slot_chain<pointer, (Base + 20 < N ? Base + 20 : Clamp)>::child;
-            case Base + 21: return &pa_slot_chain<pointer, (Base + 21 < N ? Base + 21 : Clamp)>::child;
-            case Base + 22: return &pa_slot_chain<pointer, (Base + 22 < N ? Base + 22 : Clamp)>::child;
-            case Base + 23: return &pa_slot_chain<pointer, (Base + 23 < N ? Base + 23 : Clamp)>::child;
-            case Base + 24: return &pa_slot_chain<pointer, (Base + 24 < N ? Base + 24 : Clamp)>::child;
-            case Base + 25: return &pa_slot_chain<pointer, (Base + 25 < N ? Base + 25 : Clamp)>::child;
-            case Base + 26: return &pa_slot_chain<pointer, (Base + 26 < N ? Base + 26 : Clamp)>::child;
-            case Base + 27: return &pa_slot_chain<pointer, (Base + 27 < N ? Base + 27 : Clamp)>::child;
-            case Base + 28: return &pa_slot_chain<pointer, (Base + 28 < N ? Base + 28 : Clamp)>::child;
-            case Base + 29: return &pa_slot_chain<pointer, (Base + 29 < N ? Base + 29 : Clamp)>::child;
-            case Base + 30: return &pa_slot_chain<pointer, (Base + 30 < N ? Base + 30 : Clamp)>::child;
-            case Base + 31: return &pa_slot_chain<pointer, (Base + 31 < N ? Base + 31 : Clamp)>::child;
+            case Base + 0:  return &pa_child<(Base + 0 < N ? Base + 0 : Clamp), pointer>::child;
+            case Base + 1:  return &pa_child<(Base + 1 < N ? Base + 1 : Clamp), pointer>::child;
+            case Base + 2:  return &pa_child<(Base + 2 < N ? Base + 2 : Clamp), pointer>::child;
+            case Base + 3:  return &pa_child<(Base + 3 < N ? Base + 3 : Clamp), pointer>::child;
+            case Base + 4:  return &pa_child<(Base + 4 < N ? Base + 4 : Clamp), pointer>::child;
+            case Base + 5:  return &pa_child<(Base + 5 < N ? Base + 5 : Clamp), pointer>::child;
+            case Base + 6:  return &pa_child<(Base + 6 < N ? Base + 6 : Clamp), pointer>::child;
+            case Base + 7:  return &pa_child<(Base + 7 < N ? Base + 7 : Clamp), pointer>::child;
+            case Base + 8:  return &pa_child<(Base + 8 < N ? Base + 8 : Clamp), pointer>::child;
+            case Base + 9:  return &pa_child<(Base + 9 < N ? Base + 9 : Clamp), pointer>::child;
+            case Base + 10: return &pa_child<(Base + 10 < N ? Base + 10 : Clamp), pointer>::child;
+            case Base + 11: return &pa_child<(Base + 11 < N ? Base + 11 : Clamp), pointer>::child;
+            case Base + 12: return &pa_child<(Base + 12 < N ? Base + 12 : Clamp), pointer>::child;
+            case Base + 13: return &pa_child<(Base + 13 < N ? Base + 13 : Clamp), pointer>::child;
+            case Base + 14: return &pa_child<(Base + 14 < N ? Base + 14 : Clamp), pointer>::child;
+            case Base + 15: return &pa_child<(Base + 15 < N ? Base + 15 : Clamp), pointer>::child;
+            case Base + 16: return &pa_child<(Base + 16 < N ? Base + 16 : Clamp), pointer>::child;
+            case Base + 17: return &pa_child<(Base + 17 < N ? Base + 17 : Clamp), pointer>::child;
+            case Base + 18: return &pa_child<(Base + 18 < N ? Base + 18 : Clamp), pointer>::child;
+            case Base + 19: return &pa_child<(Base + 19 < N ? Base + 19 : Clamp), pointer>::child;
+            case Base + 20: return &pa_child<(Base + 20 < N ? Base + 20 : Clamp), pointer>::child;
+            case Base + 21: return &pa_child<(Base + 21 < N ? Base + 21 : Clamp), pointer>::child;
+            case Base + 22: return &pa_child<(Base + 22 < N ? Base + 22 : Clamp), pointer>::child;
+            case Base + 23: return &pa_child<(Base + 23 < N ? Base + 23 : Clamp), pointer>::child;
+            case Base + 24: return &pa_child<(Base + 24 < N ? Base + 24 : Clamp), pointer>::child;
+            case Base + 25: return &pa_child<(Base + 25 < N ? Base + 25 : Clamp), pointer>::child;
+            case Base + 26: return &pa_child<(Base + 26 < N ? Base + 26 : Clamp), pointer>::child;
+            case Base + 27: return &pa_child<(Base + 27 < N ? Base + 27 : Clamp), pointer>::child;
+            case Base + 28: return &pa_child<(Base + 28 < N ? Base + 28 : Clamp), pointer>::child;
+            case Base + 29: return &pa_child<(Base + 29 < N ? Base + 29 : Clamp), pointer>::child;
+            case Base + 30: return &pa_child<(Base + 30 < N ? Base + 30 : Clamp), pointer>::child;
+            case Base + 31: return &pa_child<(Base + 31 < N ? Base + 31 : Clamp), pointer>::child;
             }
             std::unreachable();
         }
-        // 从 Base 开始找：先按块判断，再在块内 switch
         template<size_t N, class pointer, size_t Base = 0>
         inline pa_child_mem_ptr<N, pointer> pa_child_visitor_impl(size_t i)noexcept
         {
@@ -161,12 +153,12 @@ namespace Yc
         template<size_t N, class pointer>
         pointer& pa_slot_at(pa_node_base<N, pointer>& n, size_t i)noexcept
         {
-            return static_cast<pa_empty<N, pointer>&>(n).*pa_child_visitor<N, pointer>(i);
+            return static_cast<pa_child<N - 1, pointer>&>(n).*pa_child_visitor<N, pointer>(i);
         }
         template<size_t N, class pointer>
         const pointer& pa_slot_at(const pa_node_base<N, pointer>& n, size_t i)noexcept
         {
-            return static_cast<const pa_empty<N, pointer>&>(n).*pa_child_visitor<N, pointer>(i);
+            return static_cast<const pa_child<N - 1, pointer>&>(n).*pa_child_visitor<N, pointer>(i);
         }
 
         template<size_t N, class T, class Alloc>
