@@ -73,19 +73,93 @@ namespace Yc
         {
             return static_cast<pa_node_base<N, pointer>&>(*std::to_address(p));
         }
-        template<class pointer, size_t... Is>
-        pointer& pa_slot_at(pa_slots<pointer, std::index_sequence<Is...>>& s, size_t i)noexcept
+        // ---- 成员指针小巧思（原作者设计，勿"顺手优化"成折叠比较）-------------
+        // 每个分支是 `pa_slot<I>::child`，它是 pa_node_base 的（间接）基类的成员，所以可以把
+        // &pa_slot<I>::child 转成统一的成员指针类型 `pointer pa_node_base<N, pointer>::*`。
+        // "选哪个分支"于是变成**运行期成员指针**：一块 32 个 case 的 switch 直接返回常量成员
+        // 指针：GCC -O2 会把它折成"查一张常量偏移表 + 基址加法"（常数条指令），
+        // MSVC 用跳转表 + 每个分支一条常量返回；两者都是 O(1)，而不是 O(N) 比较链。
+        // N > 32 时先按块跳（块数很少），再在块内 switch；块内超出 N 的 case 不可达，指向
+        // 最后一个分支占位，只为让 switch 保持 32 路。
+        template<size_t N, class pointer>
+        using pa_child_mem_ptr = pointer pa_node_base<N, pointer>::*;
+
+        template<size_t N, class pointer, size_t Base>
+        constexpr pa_child_mem_ptr<N, pointer> pa_child_block(size_t i)noexcept
         {
-            pointer* ret = nullptr;
-            ((i == Is ? (void)(ret = std::addressof(static_cast<pa_slot<Is, pointer>&>(s).child)) : (void)0), ...);
-            return *ret;                    // 前置条件：i < N
+            constexpr size_t Clamp = N - 1;
+            switch (i)
+            {
+            case Base + 0:  return &pa_slot<(Base + 0 < N ? Base + 0 : Clamp), pointer>::child;
+            case Base + 1:  return &pa_slot<(Base + 1 < N ? Base + 1 : Clamp), pointer>::child;
+            case Base + 2:  return &pa_slot<(Base + 2 < N ? Base + 2 : Clamp), pointer>::child;
+            case Base + 3:  return &pa_slot<(Base + 3 < N ? Base + 3 : Clamp), pointer>::child;
+            case Base + 4:  return &pa_slot<(Base + 4 < N ? Base + 4 : Clamp), pointer>::child;
+            case Base + 5:  return &pa_slot<(Base + 5 < N ? Base + 5 : Clamp), pointer>::child;
+            case Base + 6:  return &pa_slot<(Base + 6 < N ? Base + 6 : Clamp), pointer>::child;
+            case Base + 7:  return &pa_slot<(Base + 7 < N ? Base + 7 : Clamp), pointer>::child;
+            case Base + 8:  return &pa_slot<(Base + 8 < N ? Base + 8 : Clamp), pointer>::child;
+            case Base + 9:  return &pa_slot<(Base + 9 < N ? Base + 9 : Clamp), pointer>::child;
+            case Base + 10: return &pa_slot<(Base + 10 < N ? Base + 10 : Clamp), pointer>::child;
+            case Base + 11: return &pa_slot<(Base + 11 < N ? Base + 11 : Clamp), pointer>::child;
+            case Base + 12: return &pa_slot<(Base + 12 < N ? Base + 12 : Clamp), pointer>::child;
+            case Base + 13: return &pa_slot<(Base + 13 < N ? Base + 13 : Clamp), pointer>::child;
+            case Base + 14: return &pa_slot<(Base + 14 < N ? Base + 14 : Clamp), pointer>::child;
+            case Base + 15: return &pa_slot<(Base + 15 < N ? Base + 15 : Clamp), pointer>::child;
+            case Base + 16: return &pa_slot<(Base + 16 < N ? Base + 16 : Clamp), pointer>::child;
+            case Base + 17: return &pa_slot<(Base + 17 < N ? Base + 17 : Clamp), pointer>::child;
+            case Base + 18: return &pa_slot<(Base + 18 < N ? Base + 18 : Clamp), pointer>::child;
+            case Base + 19: return &pa_slot<(Base + 19 < N ? Base + 19 : Clamp), pointer>::child;
+            case Base + 20: return &pa_slot<(Base + 20 < N ? Base + 20 : Clamp), pointer>::child;
+            case Base + 21: return &pa_slot<(Base + 21 < N ? Base + 21 : Clamp), pointer>::child;
+            case Base + 22: return &pa_slot<(Base + 22 < N ? Base + 22 : Clamp), pointer>::child;
+            case Base + 23: return &pa_slot<(Base + 23 < N ? Base + 23 : Clamp), pointer>::child;
+            case Base + 24: return &pa_slot<(Base + 24 < N ? Base + 24 : Clamp), pointer>::child;
+            case Base + 25: return &pa_slot<(Base + 25 < N ? Base + 25 : Clamp), pointer>::child;
+            case Base + 26: return &pa_slot<(Base + 26 < N ? Base + 26 : Clamp), pointer>::child;
+            case Base + 27: return &pa_slot<(Base + 27 < N ? Base + 27 : Clamp), pointer>::child;
+            case Base + 28: return &pa_slot<(Base + 28 < N ? Base + 28 : Clamp), pointer>::child;
+            case Base + 29: return &pa_slot<(Base + 29 < N ? Base + 29 : Clamp), pointer>::child;
+            case Base + 30: return &pa_slot<(Base + 30 < N ? Base + 30 : Clamp), pointer>::child;
+            case Base + 31: return &pa_slot<(Base + 31 < N ? Base + 31 : Clamp), pointer>::child;
+            }
+            std::unreachable();
         }
-        template<class pointer, size_t... Is>
-        const pointer& pa_slot_at(const pa_slots<pointer, std::index_sequence<Is...>>& s, size_t i)noexcept
+        template<size_t N, class pointer, size_t Base = 0>
+        constexpr pa_child_mem_ptr<N, pointer> pa_child_mem_ptr_impl(size_t i)noexcept
         {
-            const pointer* ret = nullptr;
-            ((i == Is ? (void)(ret = std::addressof(static_cast<const pa_slot<Is, pointer>&>(s).child)) : (void)0), ...);
-            return *ret;                    // 前置条件：i < N
+            if constexpr (Base + 32 >= N)
+            {
+                return pa_child_block<N, pointer, Base>(i);      // 最后一块
+            }
+            else
+            {
+                if (i < Base + 32)
+                {
+                    return pa_child_block<N, pointer, Base>(i);
+                }
+                return pa_child_mem_ptr_impl<N, pointer, Base + 32>(i);
+            }
+        }
+        template<size_t N, class pointer>
+        constexpr pa_child_mem_ptr<N, pointer> pa_child_mem_ptr_at(size_t i)noexcept
+        {
+            if (i >= N)
+            {
+                std::unreachable();
+            }
+            return pa_child_mem_ptr_impl<N, pointer>(i);
+        }
+        // 取"第 i 个分支槽位"的引用（前置条件：i < N）
+        template<size_t N, class pointer>
+        pointer& pa_slot_at(pa_node_base<N, pointer>& n, size_t i)noexcept
+        {
+            return n.*pa_child_mem_ptr_at<N, pointer>(i);
+        }
+        template<size_t N, class pointer>
+        const pointer& pa_slot_at(const pa_node_base<N, pointer>& n, size_t i)noexcept
+        {
+            return n.*pa_child_mem_ptr_at<N, pointer>(i);
         }
 
         template<size_t N, class T, class Alloc>
