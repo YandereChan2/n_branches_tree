@@ -6,7 +6,7 @@ edge_const_proxy root()const noexcept;
 edge_const_proxy croot()const noexcept;
 ```
 
-返回指代根 _树位置_ 的代理对象。根 _树位置_ 属于容器内部的哨位节点（第 0 个分支），因此这个边永远有效、且可以向上移动（[`go_up`](edge_proxy/edge_proxy.md) 会得到无效边，因为哨位没有父节点）。
+返回指代根 _树位置_ 的代理对象。根 _树位置_ 属于容器内部的哨位（只持有这一个槽位的指针），因此这个边永远有效；对它再调用 [`go_up`](edge_proxy/edge_proxy.md) 是未定义行为（哨位没有父节点）。
 
 空树时该 _树位置_ 为空：`root().valid()` 为 `true` ，但 `root().null()` 为 `true` 、按语境转换成 `bool` 为 `false` 。
 

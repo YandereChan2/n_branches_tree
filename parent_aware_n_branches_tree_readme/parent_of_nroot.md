@@ -10,7 +10,7 @@ node_const_proxy parent_of_cnroot()const noexcept;
 本容器为了让根节点也有父节点，内部保留一个不保有任何元素的哨位节点：它的第 0 个分支指向真根，根节点的父节点就是它。因此：
 
 - `nroot().get_parent() == parent_of_nroot()` 恒成立；
-- 从根边 `root()` 向上移动（[`go_up`](edge_proxy/edge_proxy.md)）会得到**无效边**，因为哨位节点自己没有父节点；
+- 从根边 `root()` 向上移动（[`go_up`](edge_proxy/edge_proxy.md)）是**未定义行为**：哨位只持有根槽位，没有 `parent` 字段；
 - 哨位节点上**没有元素**：对它的代理解引用（`operator*` / `operator->`）是[未定义行为](https://zh.cppreference.com/w/cpp/language/ub)。
 
 ## 参数

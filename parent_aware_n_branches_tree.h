@@ -290,7 +290,7 @@ namespace Yc
                 idx = N;
                 return *this;
             }
-            // 向上：移动到"指向本边父节点的边"；父节点是哨位时得到无效边
+            // 向上：移动到"指向本边父节点的边"；本边是根边（父节点是哨位）时为 UB
             pa_edge_proxy& go_up()noexcept
             {
                 pointer par = pa_as_node<N>(parent).parent;
@@ -838,8 +838,8 @@ namespace Yc
         using node_allocator = std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
         using node_alloc_traits = std::allocator_traits<node_allocator>;
         [[no_unique_address]] Alloc alloc{};
-        // 哨位节点：第 0 个分支是指向真根的槽位，parent 为空
-        node_base_type sentinel{};
+        // 哨位：只持有根槽位这一个指针（不是完整节点，也没有 parent；对哨位再 get_up 是 UB）
+        details::pa_child<0, node_pointer> sentinel{};
         node_pointer sentinel_pointer()noexcept
         {
             return std::pointer_traits<node_pointer>::pointer_to(static_cast<details::pa_placeholder&>(sentinel));
@@ -918,7 +918,7 @@ namespace Yc
         // 从别的树接管一棵子树的根：把它的 parent 指向本树哨位
         void adopt(node_pointer r)noexcept
         {
-            details::pa_slot_at(sentinel, 0) = r;
+            sentinel.child = r;
             if (r)
             {
                 details::pa_as_node<N>(r).parent = sentinel_pointer();
@@ -926,7 +926,7 @@ namespace Yc
         }
         void take_root_from(parent_aware_n_branches_tree& b)noexcept
         {
-            adopt(std::exchange(details::pa_slot_at(b.sentinel, 0), {}));
+            adopt(std::exchange(b.sentinel.child, {}));
         }
     public:
         // 递归写入：从外部树形结构写入 p，返回 p 处原有的子树
@@ -1075,7 +1075,7 @@ namespace Yc
         {
             return root();
         }
-        // 哨位节点本身（"根的父节点"）
+        // 哨位：只持有根槽位这一个指针（不是完整节点，也没有 parent；对哨位再 get_up 是 UB）
         node_proxy parent_of_nroot()noexcept
         {
             return { sentinel_pointer() };
