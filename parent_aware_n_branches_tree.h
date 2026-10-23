@@ -18,11 +18,14 @@
 #pragma once
 
 // MSVC 不支持标准 [[no_unique_address]]，要用它的 [[msvc::no_unique_address]]
+#ifndef YC_NO_UNIQUE_ADDRESS
 #if defined(_MSC_VER)
 #define YC_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
 #else
 #define YC_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #endif
+#endif
+
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -1249,5 +1252,3 @@ namespace Yc
         l.swap(r);
     }
 }
-
-#undef YC_NO_UNIQUE_ADDRESS

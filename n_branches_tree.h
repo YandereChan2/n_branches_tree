@@ -25,11 +25,14 @@
 #pragma once
 
 // MSVC 不支持标准 [[no_unique_address]]，要用它的 [[msvc::no_unique_address]]
+#ifndef YC_NO_UNIQUE_ADDRESS
 #if defined(_MSC_VER)
 #define YC_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
 #else
 #define YC_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #endif
+#endif
+
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -681,7 +684,7 @@ namespace Yc
         using node_type = details::n_branches_tree_node<N, T, placeholder_alloc>;
         using node_base_type = details::n_branches_tree_node_base<N, placeholder_alloc>;
         using node_allocator = std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
-        // 分配器（[[no_unique_address]] 零开销存储无状态分配器）
+        // 分配器（YC_NO_UNIQUE_ADDRESS 零开销存储无状态分配器）
         YC_NO_UNIQUE_ADDRESS Alloc alloc{};
         // 根节点指针（无哨兵节点，空树 root_ptr 为 null）
         node_pointer root_ptr{};
@@ -1132,5 +1135,3 @@ namespace Yc
         l.swap(r);
     }
 }
-
-#undef YC_NO_UNIQUE_ADDRESS
