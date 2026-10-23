@@ -874,6 +874,8 @@ namespace Yc
         {
             node_allocator a{ alloc };
             node_type* n = static_cast<node_type*>(std::to_address(p));
+            // 元素由容器自己构造/析构（data_t 的析构函数不碰 T）
+            std::destroy_at(std::addressof(static_cast<node_type&>(*n).data.data));
             node_alloc_traits::destroy(a, n);
             node_alloc_traits::deallocate(a, std::pointer_traits<typename node_alloc_traits::pointer>::pointer_to(*n), 1);
         }
