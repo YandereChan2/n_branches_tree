@@ -23,6 +23,13 @@
 // 相邻形态检查——节点里就是一排等价槽位，交换槽位 + 逐个交换孩子数组即可（父子相邻
 // 的情形会自动成立，见实现注释）。
 #pragma once
+
+// MSVC 不支持标准 [[no_unique_address]]，要用它的 [[msvc::no_unique_address]]
+#if defined(_MSC_VER)
+#define YC_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define YC_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -675,7 +682,7 @@ namespace Yc
         using node_base_type = details::n_branches_tree_node_base<N, placeholder_alloc>;
         using node_allocator = std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
         // 分配器（[[no_unique_address]] 零开销存储无状态分配器）
-        [[no_unique_address]] Alloc alloc{};
+        YC_NO_UNIQUE_ADDRESS Alloc alloc{};
         // 根节点指针（无哨兵节点，空树 root_ptr 为 null）
         node_pointer root_ptr{};
         // 获取占位符对象的 fancy pointer
@@ -1125,3 +1132,5 @@ namespace Yc
         l.swap(r);
     }
 }
+
+#undef YC_NO_UNIQUE_ADDRESS

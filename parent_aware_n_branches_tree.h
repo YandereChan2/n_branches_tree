@@ -16,6 +16,13 @@
 //
 // 命名约定与其它头文件一致：go_* 原地改自身、返回 *this；get_* 返回新代理、自身不动。
 #pragma once
+
+// MSVC 不支持标准 [[no_unique_address]]，要用它的 [[msvc::no_unique_address]]
+#if defined(_MSC_VER)
+#define YC_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define YC_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -837,7 +844,7 @@ namespace Yc
         using node_type = details::pa_node<N, T, node_pointer>;
         using node_allocator = std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
         using node_alloc_traits = std::allocator_traits<node_allocator>;
-        [[no_unique_address]] Alloc alloc{};
+        YC_NO_UNIQUE_ADDRESS Alloc alloc{};
         // 哨位：只持有根槽位这一个指针（不是完整节点，也没有 parent；对哨位再 get_up 是 UB）
         details::pa_child<0, node_pointer> sentinel{};
         node_pointer sentinel_pointer()noexcept
@@ -1243,3 +1250,4 @@ namespace Yc
     }
 }
 
+#undef YC_NO_UNIQUE_ADDRESS
